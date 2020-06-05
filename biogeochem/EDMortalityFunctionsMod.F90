@@ -164,7 +164,7 @@ contains
 
  ! ============================================================================
 
- subroutine Mortality_Derivative( currentSite, currentCohort, bc_in)
+ subroutine Mortality_Derivative( currentSite, currentCohort, bc_in, frac_site_primary)
 
     !
     ! !DESCRIPTION:
@@ -179,6 +179,7 @@ contains
     type(ed_site_type), intent(inout), target  :: currentSite
     type(ed_cohort_type),intent(inout), target :: currentCohort
     type(bc_in_type), intent(in)               :: bc_in
+    real(r8), intent(in)                       :: frac_site_primary
     !
     ! !LOCAL VARIABLES:
     real(r8) :: cmort    ! starvation mortality rate (fraction per year)
@@ -202,7 +203,8 @@ contains
                                bc_in%hlm_harvest, &
                                bc_in%hlm_harvest_catnames, &
                                currentCohort%patchptr%anthro_disturbance_label, &
-                               currentCohort%patchptr%age_since_anthro_disturbance)
+                               currentCohort%patchptr%age_since_anthro_disturbance, &
+                               frac_site_primary)
 
     
     
