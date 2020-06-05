@@ -37,11 +37,12 @@ module EDPatchDynamicsMod
   use EDTypesMod           , only : dl_sf
   use EDTypesMod           , only : dump_patch
   use FatesConstantsMod    , only : rsnbl_math_prec
-  use FatesInterfaceMod    , only : hlm_use_planthydro
-  use FatesInterfaceMod    , only : hlm_numSWb
-  use FatesInterfaceMod    , only : bc_in_type
-  use FatesInterfaceMod    , only : hlm_days_per_year
-  use FatesInterfaceMod    , only : numpft
+  use FatesConstantsMod    , only : fates_tiny
+  use FatesInterfaceTypesMod    , only : hlm_use_planthydro
+  use FatesInterfaceTypesMod    , only : hlm_numSWb
+  use FatesInterfaceTypesMod    , only : bc_in_type
+  use FatesInterfaceTypesMod    , only : hlm_days_per_year
+  use FatesInterfaceTypesMod    , only : numpft
   use FatesGlobals         , only : endrun => fates_endrun
   use FatesConstantsMod    , only : r8 => fates_r8
   use FatesConstantsMod    , only : itrue, ifalse
@@ -50,6 +51,7 @@ module EDPatchDynamicsMod
   use FatesPlantHydraulicsMod, only : DeallocateHydrCohort
   use EDLoggingMortalityMod, only : logging_litter_fluxes 
   use EDLoggingMortalityMod, only : logging_time
+  use EDLoggingMortalityMod, only : get_harvest_rate_area
   use EDParamsMod          , only : fates_mortality_disturbance_fraction
   use FatesAllometryMod    , only : carea_allom
   use FatesAllometryMod    , only : set_root_fraction
@@ -97,6 +99,7 @@ module EDPatchDynamicsMod
   public :: check_patch_area
   public :: set_patchno
   private:: fuse_2_patches
+  public :: get_frac_site_primary
 
   character(len=*), parameter, private :: sourcefile = &
         __FILE__
@@ -169,6 +172,7 @@ contains
     integer  :: threshold_sizeclass
     integer  :: i_dist
     real(r8) :: frac_site_primary
+    real(r8) :: harvest_rate
 
     !----------------------------------------------------------------------------------------------
     ! Calculate Mortality Rates (these were previously calculated during growth derivatives)
@@ -176,15 +180,8 @@ contains
     !----------------------------------------------------------------------------------------------
     
     ! first calculate the fractino of the site that is primary land
-    frac_site_primary = 0._r8
-    currentPatch => site_in%oldest_patch
-    do while (associated(currentPatch))   
-       if (currentPatch%anthro_disturbance_label .eq. primaryforest) then
-          frac_site_primary = frac_site_primary + currentPatch%area * AREA_INV
-       endif
-       currentPatch => currentPatch%younger
-    end do
-
+    call get_frac_site_primary(site_in, frac_site_primary)
+ 
     currentPatch => site_in%oldest_patch
     do while (associated(currentPatch))   
 
@@ -272,6 +269,24 @@ contains
        ! Fires can't burn the whole patch, as this causes /0 errors. 
        currentPatch%disturbance_rates(dtype_ifire) = currentPatch%frac_burnt
 
+       ! for non-closed-canopy areas subject to logging, add an additional increment of area disturbed
+       ! equivalent to the fradction loged to account for transfer of interstitial ground area to new secondary lands
+       if ( currentPatch%disturbance_rates(dtype_ilog) .gt. fates_tiny .and. &
+            (currentPatch%area - currentPatch%total_canopy_area) .gt. fates_tiny ) then
+
+          call get_harvest_rate_area (currentPatch%anthro_disturbance_label, bc_in%hlm_harvest_catnames, bc_in%hlm_harvest, &
+                 frac_site_primary, currentPatch%age_since_anthro_disturbance, harvest_rate)
+
+          currentPatch%disturbance_rates(dtype_ilog) = currentPatch%disturbance_rates(dtype_ilog) + &
+               (currentPatch%area - currentPatch%total_canopy_area) * harvest_rate * AREA_INV
+       endif
+
+       do i_dist = 1,N_DIST_TYPES
+          site_in%potential_disturbance_rates(i_dist) = site_in%potential_disturbance_rates(i_dist) + &
+               currentPatch%disturbance_rates(i_dist) * currentPatch%area * AREA_INV
+       end do
+
+       ! Fires can't burn the whole patch, as this causes /0 errors. 
        if (debug) then
           if (currentPatch%disturbance_rates(dtype_ifire) > 0.98_r8)then
           write(fates_log(),*) 'very high fire areas', &
@@ -2729,4 +2744,34 @@ contains
 
    end function countPatches
 
+  ! =====================================================================================
+
+ subroutine get_frac_site_primary(site_in, frac_site_primary)
+
+    !
+    ! !DESCRIPTION:
+    !  Calculate how much of a site is primary land
+    !
+    ! !USES:
+    use EDTypesMod , only : ed_site_type
+    !
+    ! !ARGUMENTS:
+    type(ed_site_type) , intent(in), target :: site_in
+    real(r8)           , intent(out)        :: frac_site_primary
+
+    ! !LOCAL VARIABLES:
+    type (ed_patch_type), pointer :: currentPatch
+
+   frac_site_primary = 0._r8
+   currentPatch => site_in%oldest_patch
+   do while (associated(currentPatch))   
+      if (currentPatch%anthro_disturbance_label .eq. primaryforest) then
+         frac_site_primary = frac_site_primary + currentPatch%area * AREA_INV
+      endif
+      currentPatch => currentPatch%younger
+   end do
+
+ end subroutine get_frac_site_primary
+
  end module EDPatchDynamicsMod
+
