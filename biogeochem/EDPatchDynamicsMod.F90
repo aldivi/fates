@@ -38,11 +38,11 @@ module EDPatchDynamicsMod
   use EDTypesMod           , only : dump_patch
   use FatesConstantsMod    , only : rsnbl_math_prec
   use FatesConstantsMod    , only : fates_tiny
-  use FatesInterfaceTypesMod    , only : hlm_use_planthydro
-  use FatesInterfaceTypesMod    , only : hlm_numSWb
-  use FatesInterfaceTypesMod    , only : bc_in_type
-  use FatesInterfaceTypesMod    , only : hlm_days_per_year
-  use FatesInterfaceTypesMod    , only : numpft
+  use FatesInterfaceMod    , only : hlm_use_planthydro
+  use FatesInterfaceMod    , only : hlm_numSWb
+  use FatesInterfaceMod    , only : bc_in_type
+  use FatesInterfaceMod    , only : hlm_days_per_year
+  use FatesInterfaceMod    , only : numpft
   use FatesGlobals         , only : endrun => fates_endrun
   use FatesConstantsMod    , only : r8 => fates_r8
   use FatesConstantsMod    , only : itrue, ifalse
